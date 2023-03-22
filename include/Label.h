@@ -31,24 +31,30 @@ public:
         int canvas_per_frame;
         int max_objects;
 
+        int label_index;
+
         // paths and names of folders
         string labelName;
         string outputPath;
         string datasetName;
 	vector<string>*	 backgrounds;
 	vector<string>* inputs;
-	string masks_png;
-	string masks_json;
-        string imgs;
-        string xml;
+	string masks_png_path;
+	string masks_json_path;
+        string imgs_path;
+        string bndBox_PASCALVOC_path;
+        string masks_yolo_path;
+        string bndBox_yolo_path;
         
-        bool save_bnd_box;
-        bool save_masks_png;
-        bool save_masks_json;
+        bool output_boxes_pascalVoc;
+        bool output_masks_png;
+        bool output_masks_json;
+        bool output_mask_yolo;
+        bool output_boxes_yolo;
 
 	bool debug;
 
-Label(string label, string dataset, string output, int affine, int saturation, int bright, int blurr, int lowRes, int canvasQt, int max_obj, vector<string>* input, vector<string>* background,bool save_bnd_box, bool save_masks_png, bool save_masks_json, bool debugArg);
+Label(string label, string dataset, string output, int affine, int saturation, int bright, int blurr, int lowRes, int canvasQt, int max_obj, vector<string>* input, vector<string>* background,bool output_boxes_pascalVoc, bool output_masks_png, bool output_masks_json, bool output_boxes_yolo, bool output_mask_yolo, bool debugArg, int label_index);
 
 void saveImg(cv::Mat img, string name);
 
@@ -57,6 +63,10 @@ void saveMask(cv::Mat mask, string name);
 void saveXML(vector<vector<int>> rois, string name, cv::Mat img);
 
 void saveJson(vector<vector<cv::Point>> contours, cv::Mat img, string name);
+
+void saveYoloBox(vector<vector<int>> rois, string name, cv::Mat img);
+
+void saveYoloMask(vector<vector<cv::Point>> contours, cv::Mat img, string name);
 
 cv::Mat getRandomBackground();
 

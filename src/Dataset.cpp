@@ -22,6 +22,8 @@ Dataset::Dataset(string pathToDataset){ // load the config from yeet file
         // creates the label map later used for training and testing
         create_label_map();
 
+        int label_index = 0;
+
 	for (string label_path : Dataset::labels){
 
 	
@@ -45,7 +47,9 @@ Dataset::Dataset(string pathToDataset){ // load the config from yeet file
 		vector<string> videoFiles = Dataset::getLabelFiles(label_path);
 		cout << videoFiles.size() << endl;
 
-		Label labelObject = Label(labelName, Dataset::datasetName, Dataset::outputPath, Dataset::obj_affineProb , Dataset::obj_changeSatProb, Dataset::can_changeBrightProb, Dataset::can_blurrProb, Dataset::can_lowerRes, Dataset::canvas_per_frame, Dataset::max_objects, &videoFiles, &backgrounds, Dataset::save_bnd_box, Dataset::save_masks_png, Dataset::save_masks_json, false);
+		Label labelObject = Label(labelName, Dataset::datasetName, Dataset::outputPath, Dataset::obj_affineProb , Dataset::obj_changeSatProb, Dataset::can_changeBrightProb, Dataset::can_blurrProb, Dataset::can_lowerRes, Dataset::canvas_per_frame, Dataset::max_objects, &videoFiles, &backgrounds, Dataset::output_boxes_pascalVoc, Dataset::output_masks_png, Dataset::output_masks_json, Dataset::output_mask_yolo, Dataset::output_boxes_yolo, false, label_index);
+
+                label_index ++;
 
 	}
 
@@ -100,45 +104,45 @@ bool Dataset::createOutputDirs(){
 
         }
 
-        if(dirExists(Dataset::masks_png.c_str())){
+        if(dirExists(Dataset::masks_png_path.c_str())){
                 cout << "> Output for Dataset::masks_png/ already exists, using existing directory" << endl;
         }else{
 
-                if(fs::create_directory(Dataset::masks_png)){
-                        cout << "> Label: created " << Dataset::masks_png << endl;
+                if(fs::create_directory(Dataset::masks_png_path)){
+                        cout << "> Label: created " << Dataset::masks_png_path << endl;
                 }else{
 
-                        cout << "> Label: could not create " << Dataset::masks_png << endl;
+                        cout << "> Label: could not create " << Dataset::masks_png_path << endl;
 			string message = "Error: Could not create masks_png path.";
                         throw message;
                 }
 
         }
 
-        if(dirExists(Dataset::masks_json.c_str())){
+        if(dirExists(Dataset::masks_json_path.c_str())){
         cout << "> Output for Dataset::masks_json/ already exists, using existing directory" << endl;
         }else{
 
-                if(fs::create_directory(Dataset::masks_json)){
-                        cout << "> Label: created " << Dataset::masks_json << endl;
+                if(fs::create_directory(Dataset::masks_json_path)){
+                        cout << "> Label: created " << Dataset::masks_json_path << endl;
                 }else{
 
-                        cout << "> Label: could not create " << Dataset::masks_json << endl;
+                        cout << "> Label: could not create " << Dataset::masks_json_path << endl;
 			string message = "Error: Could not create masks_json path.";
                         throw message;
                 }
 
         }
 
-        if(dirExists(Dataset::imgs.c_str())){
+        if(dirExists(Dataset::imgs_path.c_str())){
                 cout << "> Output for Dataset::imgs/ already exists, using existing directory" << endl;
         }else{
 
-                if(fs::create_directory(Dataset::imgs)){
-                        cout << "> Label: created " << Dataset::imgs << endl;
+                if(fs::create_directory(Dataset::imgs_path)){
+                        cout << "> Label: created " << Dataset::imgs_path << endl;
                 }else{
 
-                        cout << "> Label: could not create " << Dataset::imgs << endl;
+                        cout << "> Label: could not create " << Dataset::imgs_path << endl;
 			string message = "Error: Could not create imgs path.";
                         throw message;
 
@@ -146,16 +150,46 @@ bool Dataset::createOutputDirs(){
 
         }
 
-        if(dirExists(Dataset::xml.c_str())){
-                cout << "> Output for Dataset::xml/ already exists, using existing directory" << endl;
+        if(dirExists(Dataset::bndBox_PASCALVOC_path.c_str())){
+                cout << "> Output for Dataset::bndBox_PASCALVOC_path/ already exists, using existing directory" << endl;
         }else{
 
-                if(fs::create_directory(Dataset::xml)){
-                        cout << "> Label: created " << Dataset::xml << endl;
+                if(fs::create_directory(Dataset::bndBox_PASCALVOC_path)){
+                        cout << "> Label: created " << Dataset::bndBox_PASCALVOC_path << endl;
                 }else{
 
-                        cout << "> Label: could not create " << Dataset::xml << endl;
+                        cout << "> Label: could not create " << Dataset::bndBox_PASCALVOC_path << endl;
 			string message = "Error: Could not create xml path.";
+                        throw message;
+                }
+
+        }
+
+        if(dirExists(Dataset::bndBox_yolo_path.c_str())){
+                cout << "> Output for Dataset::bndBox_yolo_path/ already exists, using existing directory" << endl;
+        }else{
+
+                if(fs::create_directory(Dataset::bndBox_yolo_path)){
+                        cout << "> Label: created " << Dataset::bndBox_yolo_path << endl;
+                }else{
+
+                        cout << "> Label: could not create " << Dataset::bndBox_yolo_path << endl;
+			string message = "Error: Could not create bndBox_yolo path.";
+                        throw message;
+                }
+
+        }
+
+        if(dirExists(Dataset::masks_yolo_path.c_str())){
+                cout << "> Output for Dataset::masks_yolo_path/ already exists, using existing directory" << endl;
+        }else{
+
+                if(fs::create_directory(Dataset::masks_yolo_path)){
+                        cout << "> Label: created " << Dataset::masks_yolo_path << endl;
+                }else{
+
+                        cout << "> Label: could not create " << Dataset::masks_yolo_path << endl;
+			string message = "Error: Could not create masks_yolo_path path.";
                         throw message;
                 }
 
@@ -468,25 +502,41 @@ void Dataset::setSettings (vector<vector<string>> file){
                 else if (word.compare("save_masks_png") == 0){
                         string save_masks_png_str = line.at(1);
                         if (save_masks_png_str == "True" || save_masks_png_str == "true"){
-                                Dataset::save_masks_png = true;
+                                Dataset::output_masks_png = true;
                         }else{
-                                Dataset::save_masks_png = false;
+                                Dataset::output_masks_png = false;
                         }
                 }
                 else if (word.compare("save_masks_json") == 0){
                         string save_masks_json_str = line.at(1);
                         if (save_masks_json_str == "True" || save_masks_json_str == "true"){
-                                Dataset::save_masks_json = true;
+                                Dataset::output_masks_json = true;
                         }else{
-                                Dataset::save_masks_json = false;
+                                Dataset::output_masks_json = false;
                         }
                 }
-                else if (word.compare("save_bnd_box") == 0){
+                else if (word.compare("save_box_PASCALVOC") == 0){
                         string save_bnd_box_str = line.at(1);
                         if (save_bnd_box_str == "True" || save_bnd_box_str == "true"){
-                                Dataset::save_bnd_box = true;
+                                Dataset::output_boxes_pascalVoc = true;
                         }else{
-                                Dataset::save_bnd_box = false;
+                                Dataset::output_boxes_pascalVoc = false;
+                        }
+                }
+                else if (word.compare("save_box_yolo") == 0){
+                        string save_bnd_box_yolo_str = line.at(1);
+                        if (save_bnd_box_yolo_str == "True" || save_bnd_box_yolo_str == "true"){
+                                Dataset::output_boxes_yolo = true;
+                        }else{
+                                Dataset::output_boxes_yolo = false;
+                        }
+                }
+                else if (word.compare("save_masks_yolo") == 0){
+                        string save_mask_yolo_str = line.at(1);
+                        if (save_mask_yolo_str == "True" || save_mask_yolo_str == "true"){
+                                Dataset::output_mask_yolo = true;
+                        }else{
+                                Dataset::output_mask_yolo = false;
                         }
                 }
                 else if (word.compare("input_path") == 0){
@@ -512,19 +562,21 @@ void Dataset::setSettings (vector<vector<string>> file){
 	}
 
 	// three folders to be created
-        Dataset::masks_json = Dataset::outputPath + "masks_json/";
-        Dataset::masks_png = Dataset::outputPath + "masks_png/";
-        Dataset::imgs = Dataset::outputPath + "images/";
-        Dataset::xml = Dataset::outputPath + "bnd_box_xml/";
+        Dataset::masks_json_path = Dataset::outputPath + "masks_json/";
+        Dataset::masks_png_path = Dataset::outputPath + "masks_png/";
+        Dataset::imgs_path = Dataset::outputPath + "images/";
+        Dataset::bndBox_PASCALVOC_path = Dataset::outputPath + "bnd_box_PASCALVOC/";
+        Dataset::masks_yolo_path = Dataset::outputPath + "masks_yolo/";
+        Dataset::bndBox_yolo_path = Dataset::outputPath + "bnd_box_yolo/";
 
 	// prints out all the settings allowing the user to check that everything is ok
         cout << "\n========================= Dataset Configuration ==================================" << endl;
         cout << "> readFile: path to background:                             " << Dataset::backgroundPath << endl;
         cout << "> readFile: output path:                                    " << Dataset::outputPath << endl;
-        cout << "> readFile: images save path:                             " << Dataset::imgs << endl;
-        cout << "> readFile: bnb box xml save path:                        " << Dataset::xml << endl;
-        cout << "> readFile: masks json save path:                         " << Dataset::masks_json << endl;
-        cout << "> readFile: masks png save path:                          " << Dataset::masks_png << endl;
+        cout << "> readFile: images save path:                             " << Dataset::imgs_path << endl;
+        cout << "> readFile: bnb box xml save path:                        " << Dataset::bndBox_PASCALVOC_path << endl;
+        cout << "> readFile: masks json save path:                         " << Dataset::masks_json_path << endl;
+        cout << "> readFile: masks png save path:                          " << Dataset::masks_png_path << endl;
         cout << "> readFile: dataset name:                                   " << Dataset::datasetName  << endl;
         cout << "> readFile: number of canvases created per video frame:     " << Dataset::canvas_per_frame << endl;
         cout << "> readFile: max number of objects to be put in each canvas: " << Dataset::max_objects << endl;

@@ -32,22 +32,33 @@ public:
         int canvas_per_frame = 4;
         int max_objects = 5;
 
-		// annotation save options
-		bool save_masks_png = true;
-		bool save_masks_json = true;
-		bool save_bnd_box = true;
+		// bool save_masks_png = true;
+		// bool save_masks_json = true;
+		// bool save_bnd_box = true;
 
         // paths and names of folders
         string outputPath;
         string datasetName;
+
 		string inputPath;
 		string backgroundPath;
 		vector<string> labels;
 		vector<string> backgrounds;
-        string masks_json;
-		string masks_png;
-        string imgs;
-        string xml;
+
+		// output paths
+	    string masks_yolo_path;	
+        string masks_json_path;
+		string masks_png_path;
+        string imgs_path;
+        string bndBox_yolo_path;
+		string bndBox_PASCALVOC_path;
+
+		// annotation save options
+		bool output_masks_png;
+		bool output_masks_json;
+		bool output_boxes_pascalVoc;;
+		bool output_mask_yolo;
+		bool output_boxes_yolo;
 
 
 	Dataset(string pathToYeet);

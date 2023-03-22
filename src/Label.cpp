@@ -17,7 +17,7 @@ Step5: Save the Canvases.jpg Masks.jpg and Roi.Label::xml files
 */
 #include "../include/Label.h"
 
-Label::Label(string label, string dataset, string output, int affine, int saturation, int bright, int blurr, int lowRes, int canvasQt, int max_obj, vector<string>* input, vector<string>* background, bool save_bnd_box, bool save_masks_png, bool save_masks_json, bool debugArg){
+Label::Label(string label, string dataset, string output, int affine, int saturation, int bright, int blurr, int lowRes, int canvasQt, int max_obj, vector<string>* input, vector<string>* background, bool output_boxes_pascalVoc, bool output_masks_png, bool output_masks_json, bool output_boxes_yolo, bool output_mask_yolo, bool debugArg, int label_index){
 
 	// pointer to the background array;
 	Label::backgrounds = background;
@@ -36,18 +36,23 @@ Label::Label(string label, string dataset, string output, int affine, int satura
 	Label::canvas_per_frame = canvasQt;
 	Label::max_objects = max_obj;
 
-	Label::save_bnd_box = save_bnd_box;
-	Label::save_masks_json = save_masks_json;
-	Label::save_masks_png = save_masks_png;
+	Label::output_boxes_pascalVoc = output_boxes_pascalVoc;
+	Label::output_masks_json = output_masks_json;
+	Label::output_masks_png = output_masks_png;
+	Label::output_boxes_yolo = output_boxes_yolo;
+	Label::output_mask_yolo = output_mask_yolo;
 
 
 	// forgot why I am redefining them here
-	Label::masks_png = Label::outputPath + "masks_png/";
-	Label::masks_json = Label::outputPath + "masks_json/";
-	Label::imgs = Label::outputPath + "images/";
-	Label::xml = Label::outputPath + "bnd_box_xml/";
+	Label::masks_png_path = Label::outputPath + "masks_png/";
+	Label::masks_json_path = Label::outputPath + "masks_json/";
+	Label::imgs_path = Label::outputPath + "images/";
+	Label::bndBox_PASCALVOC_path = Label::outputPath + "bnd_box_PASCALVOC/";
+	Label::masks_yolo_path = Label::outputPath + "masks_yolo/";
+	Label::bndBox_yolo_path = Label::outputPath + "bnd_box_yolo/";
 	
 	Label::debug = debugArg;
+	Label::label_index = label_index;
 	
 	// for each input file
 	for(int i = 0; i < Label::inputs->size(); i ++){
@@ -77,8 +82,9 @@ Label::Label(string label, string dataset, string output, int affine, int satura
 						break;
 
 				}
-				//cout << omp_get_max_threads() << endl;
 
+
+				// it would be much smarter to divide the dataset into a video for each thread instead of what ever the fuck this is. 
 				#pragma omp task
 				{
 					int id = omp_get_thread_num();
@@ -99,15 +105,20 @@ Label::Label(string label, string dataset, string output, int affine, int satura
 						cv::Mat img = canvas.getCanvas();
 						saveImg(img, name);
 
-						if (Label::save_masks_png){
+						if (Label::output_masks_png){
 							saveMask(canvas.getMask(), name);
 						}
 
-						if (Label::save_bnd_box){
+
+						if (Label::output_boxes_pascalVoc){
 							saveXML(canvas.getRois(), name, img);
 						}
 
-						if (Label::save_masks_json){
+						if (Label::output_boxes_yolo){
+							saveYoloBox(canvas.getRois(), name, img);
+						}
+
+						if (Label::output_masks_json){
 							// draw the point outline on the image to make sure it is accurate
 							vector<vector<cv::Point>> contours = canvas.calculateOutline();
 							saveJson(contours, img, name);
@@ -130,6 +141,11 @@ Label::Label(string label, string dataset, string output, int affine, int satura
 								int k = cv::waitKey(0);
 
 							}
+						}
+
+						if (Label::output_mask_yolo){
+							vector<vector<cv::Point>> contours = canvas.calculateOutline();
+							Label::saveYoloMask(contours, img, name);
 						}
 				
 
@@ -158,13 +174,13 @@ Label::Label(string label, string dataset, string output, int affine, int satura
 
 void Label::saveImg(cv::Mat img, string name){
 
-	string path = Label::imgs + name + ".jpg";
+	string path = Label::imgs_path + name + ".jpg";
 	cv::imwrite(path, img);
 }
 
 void Label::saveMask(cv::Mat mask, string name){
 
-	string path = Label::masks_png + name + ".png";
+	string path = Label::masks_png_path + name + ".png";
 	cv::imwrite(path, mask);
 
 }
@@ -177,11 +193,11 @@ void Label::saveXML(vector<vector<int>> rois, string name, cv::Mat img){
 	int ichannels = img.channels();
 
 	string sHeight = to_string(iheight);
-       	string sWidth = to_string(iwidth);
+    string sWidth = to_string(iwidth);
 	string sChannel = to_string(ichannels);
 
 	// save path of the image not the Label::xml
-	string fullPath = Label::imgs + name + ".jpg";	
+	string fullPath = Label::imgs_path + name + ".jpg";	
 
 	// image being refered to path
 	string img_filename = name + ".jpg";
@@ -294,9 +310,103 @@ void Label::saveXML(vector<vector<int>> rois, string name, cv::Mat img){
 
         doc.LinkEndChild( decl );
         doc.LinkEndChild( annotation );
-	string savePath = Label::xml + name + ".xml";
+		string savePath = Label::bndBox_PASCALVOC_path + name + ".xml";
         doc.SaveFile( savePath.c_str() );
 	// need to test this
+
+}
+
+
+// return the normalized x y coordinates of bounding boxes
+void Label::saveYoloBox(vector<vector<int>> rois, string name, cv::Mat img){
+
+
+	std::ofstream fs(Label::bndBox_yolo_path + name + ".txt"); 
+
+
+    if(!fs)
+    {
+        std::cerr<<"Cannot open the output file."<<std::endl;
+    }
+		// for each contour
+
+	
+	// init the line with the label index
+
+
+	// image dimentions 
+	int iheight = img.rows;
+	int iwidth = img.cols;
+
+	//add all the damn contours
+	for(vector<int> roi : rois){
+
+		string line = to_string(Label::label_index);
+
+		// normalize points
+		float x1 = (static_cast<float>(roi[0]) / static_cast<float>(iwidth));
+		float y1 = (static_cast<float>(roi[1]) / static_cast<float>(iheight));
+		float x2 = (static_cast<float>(roi[2]) / static_cast<float>(iwidth));
+		float y2 = (static_cast<float>(roi[3]) / static_cast<float>(iheight));
+
+		// convert to centerx centery weidth height
+		float centerX = x1 + ((x2 - x1) / 2);
+		float centerY = y1 + ((y2 - y1) / 2);
+		float box_width = x2 - x1;
+		float box_height = y2 - y1;
+
+		line.append(" " + to_string(centerX) + " " + to_string(centerY) + " " + to_string(box_width) + " " + to_string(box_height));
+
+		fs<<line<<"\n";
+
+	}
+
+
+
+    fs.close();
+
+}
+
+// return the normalized x y coordinates
+void Label::saveYoloMask(vector<vector<cv::Point>> contours, cv::Mat img, string name){
+
+
+	std::ofstream fs(Label::masks_yolo_path + name + ".txt"); 
+
+
+    if(!fs)
+    {
+        std::cerr<<"Cannot open the output file."<<std::endl;
+    }
+		// for each contour
+	for(vector<cv::Point> contour : contours){
+	
+		Json::Value shape;
+		Json::Value points(Json::arrayValue);
+
+		// init the line with the label index
+		string line = to_string(Label::label_index);
+
+		// image dimentions 
+		int iheight = img.rows;
+		int iwidth = img.cols;
+
+		//add all the damn contours
+		for (cv:: Point point : contour){
+			
+			// normalize points
+			float x = static_cast<float>(point.x) / static_cast<float>(iwidth);
+			float y = static_cast<float>(point.y) / static_cast<float>(iheight);
+
+			line.append(" " + std::to_string(x) + " " + std::to_string(y));
+
+		}
+
+		fs<<line<<"\n";
+
+	}
+
+    fs.close();
 
 }
 
@@ -310,7 +420,7 @@ void Label::saveJson(vector<vector<cv::Point>> contours, cv::Mat img, string nam
 	int iwidth = img.cols;
 
 	string sHeight = to_string(iheight);
-       	string sWidth = to_string(iwidth);
+    string sWidth = to_string(iwidth);
 
 	annotation["imageWidth"] = sWidth.c_str();
 	annotation["imageHeight"] = sHeight.c_str();
@@ -349,7 +459,7 @@ void Label::saveJson(vector<vector<cv::Point>> contours, cv::Mat img, string nam
 	builder["indentation"] = "   ";
 
 	std::unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
-	std::ofstream outputFileStream(Label::masks_json + name + ".json");
+	std::ofstream outputFileStream(Label::masks_json_path + name + ".json");
 	writer -> write(annotation, &outputFileStream);
 	
 }
